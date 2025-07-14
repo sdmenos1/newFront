@@ -109,22 +109,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const validateToken = async (token: string): Promise<boolean> => {
-    try {
-      const response = await fetch("http://localhost:3001/auth/validate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ token }),
-      });
+  try {
+    const response = await fetch("http://localhost:3001/auth/validate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Eliminamos: Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ token }),
+    });
 
-      return response.ok;
-    } catch (error) {
-      console.error("Error validando token:", error);
-      return false;
-    }
-  };
+    return response.ok;
+  } catch (error) {
+    console.error("Error validando token:", error);
+    return false;
+  }
+};
+
 
   // En AuthProvider dentro de useEffect
   useEffect(() => {

@@ -5,7 +5,8 @@ const API_BASE_URL =
 
 const SERVICES = {
   AUTH: `${API_BASE_URL}:3001`,
-  STUDENTS: `${API_BASE_URL}:3002`,
+  USERS: `${API_BASE_URL}:3002`,
+  COURSES: `${API_BASE_URL}:3005`,
   ATTENDANCE: `${API_BASE_URL}:3003`,
   GRADES: `${API_BASE_URL}:3004`,
 };
@@ -14,23 +15,22 @@ class ApiClient {
   private token: string | null = null;
 
   constructor() {
-    // Solo acceder a localStorage en el cliente
     if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("auth_token");
+      this.token = localStorage.getItem("token");
     }
   }
 
   setToken(token: string) {
     this.token = token;
     if (typeof window !== "undefined") {
-      localStorage.setItem("auth_token", token);
+      localStorage.setItem("token", token);
     }
   }
 
   clearToken() {
     this.token = null;
     if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_token");
+      localStorage.removeItem("token");
     }
   }
 
@@ -40,36 +40,28 @@ class ApiClient {
       ...options.headers,
     };
 
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+      try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        message: `HTTP ${response.status}: ${response.statusText}`,
+      }));
+      throw new Error(error.message || "Request failed");
     }
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({
-          message: `HTTP ${response.status}: ${response.statusText}`,
-        }));
-        throw new Error(error.message || "Request failed");
-      }
-
-      return response.json();
-    } catch (error) {
-      // Mejorar el manejo de errores de conexión
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        throw new Error(
-          "Backend service not available. Please ensure the microservices are running."
-        );
-      }
-      throw error;
+    return response.json();
+  } catch (error) {
+    if (error instanceof TypeError && error.message.includes("fetch")) {
+      throw new Error("Backend service not available. Please ensure the microservices are running.");
     }
+    throw error;
   }
+}
 
-  // Auth Service
   async login(email: string, password: string) {
     const response = await this.request(`${SERVICES.AUTH}/auth/login`, {
       method: "POST",
@@ -83,34 +75,24 @@ class ApiClient {
     return response;
   }
 
-  async validateToken() {
-    if (!this.token) {
-      throw new Error("No token available");
-    }
-
+  async validateAuthToken(): Promise<{ success: boolean; data: any }> {
     return this.request(`${SERVICES.AUTH}/auth/validate`, {
       method: "POST",
       body: JSON.stringify({ token: this.token }),
     });
   }
 
-  // Students Service
+  // Users Service (Students & Teachers)
   async getStudent(id: number) {
-    return this.request(`${SERVICES.STUDENTS}/students/${id}`);
+    return this.request(`${SERVICES.USERS}/students/${id}`);
   }
 
-  async getStudentCourses(id: number) {
-    return this.request(`${SERVICES.STUDENTS}/students/${id}/courses`);
+  async getTeacher(id: number) {
+    return this.request(`${SERVICES.USERS}/students/teachers/${id}`);
   }
 
-  async getStudentsByTeacher(teacherId: number) {
-    return this.request(
-      `${SERVICES.STUDENTS}/students/by-teacher/${teacherId}`
-    );
-  }
-
-  async getStudentsByCourse(courseId: number) {
-    return this.request(`${SERVICES.STUDENTS}/students/by-course/${courseId}`);
+  async getAllTeachers() {
+    return this.request(`${SERVICES.USERS}/students/teachers`);
   }
 
   async searchStudents(params: {
@@ -125,8 +107,99 @@ class ApiClient {
     });
 
     return this.request(
-      `${SERVICES.STUDENTS}/students?${queryParams.toString()}`
+      `${SERVICES.USERS}/students?${queryParams.toString()}`
     );
+  }
+
+  async createStudent(studentData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    grade?: string;
+    section?: string;
+    level?: string;
+    [key: string]: any;
+  }) {
+    return this.request(`${SERVICES.USERS}/students`, {
+      method: "POST",
+      body: JSON.stringify(studentData),
+    });
+  }
+
+  async createTeacher(teacherData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    [key: string]: any;
+  }) {
+    return this.request(`${SERVICES.USERS}/students/teachers`, {
+      method: "POST",
+      body: JSON.stringify(teacherData),
+    });
+  }
+
+  async validateStudentLogin(email: string, password: string) {
+    return this.request(`${SERVICES.USERS}/students/validate-login`, {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async validateTeacherLogin(email: string, password: string) {
+    return this.request(`${SERVICES.USERS}/students/teachers/validate-login`, {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  // Courses Service (New microservice)
+  async getAllCourses() {
+    return this.request(`${SERVICES.COURSES}/courses`);
+  }
+
+  async createCourse(courseData: {
+    code: string;
+    name: string;
+    description?: string;
+    teacherId: number;
+    teacherName: string;
+    credits: number;
+    classroom?: string;
+  }) {
+    return this.request(`${SERVICES.COURSES}/courses`, {
+      method: "POST",
+      body: JSON.stringify(courseData),
+    });
+  }
+
+  async assignCourseToStudent(assignmentData: {
+    studentId: number;
+    courseId: number;
+    academicYear: string;
+    semester: string;
+  }) {
+    return this.request(`${SERVICES.COURSES}/courses/student-courses`, {
+      method: "POST",
+      body: JSON.stringify(assignmentData),
+    });
+  }
+
+  // api.ts
+
+async getStudentCourses(studentId: string) {
+  return this.request(`${SERVICES.USERS}/students/${studentId}/courses`);
+}
+
+
+
+  async getStudentsByCourse(courseId: number) {
+    return this.request(`${SERVICES.COURSES}/courses/by-course/${courseId}`);
+  }
+
+  async getStudentsByTeacher(teacherId: number) {
+    return this.request(`${SERVICES.COURSES}/courses/by-teacher/${teacherId}`);
   }
 
   // Attendance Service
