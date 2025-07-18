@@ -10,19 +10,22 @@ import { useStudent } from "@/context/student-context";
 import StudentLayout from "@/components/student-layout";
 import { apiClient } from "@/lib/api";
 
-interface CourseScheduleSlot {
-  day: string;
-  time: string;
-}
 
 interface Course {
-  id: string;
+  id: number;
+  code: string;
   name: string;
-  teacher: string;
-  room: string;
+  description: string;
+  teacherId: number;
+  teacherName: string;
+  grade: string;
+  section: string;
+  level: string;
   credits: number;
-  color?: string;
-  schedule: CourseScheduleSlot[];
+  classroom: string;
+  isActive: boolean;
+  createdAt: string;
+  schedule?: { day: string; time: string }[]; // Opcional, si lo manejas por separado
 }
 
 export default function StudentDashboard() {
@@ -32,23 +35,35 @@ export default function StudentDashboard() {
 
   useEffect(() => {
   const loadCourses = async () => {
-    if (student) {
-      console.log("👤 Student cargado:", student);
+    if (!student) return;
 
-      try {
-        const fetchedCourses = await apiClient.getStudentCourses(student.id);
-        console.log("📚 Cursos obtenidos:", fetchedCourses);
-        setCourses(fetchedCourses);
-      } catch (err) {
-        console.error("Error al cargar cursos:", err);
-      }
-    } else {
-      console.log("❌ Student no disponible aún");
+    try {
+      console.log("👤 Cargando cursos para:", student);
+
+      // 1. Cursos asignados al estudiante (devuelve IDs o curso simple)
+      const assignedCourses = await apiClient.getStudentCourses(student.id);
+
+      // 2. Todos los cursos del sistema (con créditos, profe, etc.)
+      const allCourses = await apiClient.getCourses();
+
+      const assignedCourseIds = Array.isArray(assignedCourses.data)
+        ? assignedCourses.data.map((c: any) => c.id)
+        : [];
+
+      // 3. Filtrar solo los cursos asignados con su data completa
+      const fullCourses = allCourses.data?.filter((course: any) =>
+        assignedCourseIds.includes(course.id)
+      );
+
+      setCourses(fullCourses || []);
+    } catch (err) {
+      console.error("❌ Error al cargar cursos del estudiante:", err);
     }
   };
 
   loadCourses();
 }, [student]);
+
 
 
   if (!student) {
@@ -150,9 +165,9 @@ export default function StudentDashboard() {
                         <div key={course.id} className="text-sm">
                           <p className="font-medium text-gray-900">{course.name}</p>
                           <p className="text-gray-600">
-                            {todaySchedule?.time} - {course.room}
+                            {todaySchedule?.time} - {course.classroom}
                           </p>
-                          <p className="text-xs text-gray-500">{course.teacher}</p>
+                          <p className="text-xs text-gray-500">{course.teacherName}</p>
                         </div>
                       );
                     })}
@@ -181,8 +196,8 @@ export default function StudentDashboard() {
                   <p><span className="font-medium">Nivel:</span> {student.level}</p>
                   <p><span className="font-medium">Cursos:</span> {courses.length}</p>
                   <p><span className="font-medium">Créditos Totales:</span> {totalCredits}</p>
-                  {student.studentCode && (
-                    <p><span className="font-medium">Código:</span> {student.studentCode}</p>
+                  {student.id && (
+                    <p><span className="font-medium">Código:</span> {student.id}</p>
                   )}
                 </div>
               </CardContent>
@@ -200,9 +215,9 @@ export default function StudentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
-                  <p><span className="font-medium">Nombre:</span> {student.name}</p>
+                  <p><span className="font-medium">Nombre:</span> {student.firstName + student.lastName}</p>
                   {student.email && <p><span className="font-medium">Email:</span> {student.email}</p>}
-                  <p><span className="font-medium">Año Académico:</span> {student.academicYear}</p>
+                  <p><span className="font-medium">Año Académico:</span> {student.level}</p>
                 </div>
               </CardContent>
             </Card>
@@ -218,12 +233,12 @@ export default function StudentDashboard() {
                 <Card key={course.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
                     <div
-                      className={`w-full h-2 ${course.color || "bg-gray-300"} rounded-full mb-3`}
+                      className={`w-full h-2 "bg-gray-300" rounded-full mb-3`}
                     ></div>
                     <h4 className="font-semibold text-gray-900 mb-2">{course.name}</h4>
-                    <p className="text-sm text-gray-600 mb-1">{course.teacher}</p>
+                    <p className="text-sm text-gray-600 mb-1">{course.teacherName}</p>
                     <p className="text-xs text-gray-500">
-                      {course.room} • {course.credits} créditos
+                      {course.classroom} • {course.credits} créditos
                     </p>
                     <p className="text-xs text-gray-500 mt-2">
                       {course.schedule?.length} sesiones por semana

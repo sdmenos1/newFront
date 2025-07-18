@@ -187,12 +187,12 @@ class ApiClient {
   }
 
   // api.ts
-
-async getStudentCourses(studentId: string) {
-  return this.request(`${SERVICES.USERS}/students/${studentId}/courses`);
+async getCourses() {
+  return this.request(`${SERVICES.COURSES}/courses`);
 }
-
-
+async getStudentCourses(studentId: number) {
+  return this.request(`${SERVICES.COURSES}/courses/student/${studentId}`);
+}
 
   async getStudentsByCourse(courseId: number) {
     return this.request(`${SERVICES.COURSES}/courses/by-course/${courseId}`);
@@ -226,27 +226,11 @@ async getStudentCourses(studentId: string) {
     });
   }
 
-  async getStudentAttendance(
-    studentId: number,
-    params?: {
-      courseId?: number;
-      startDate?: string;
-      endDate?: string;
-    }
-  ) {
-    const queryParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value) queryParams.append(key, value.toString());
-      });
-    }
-
-    return this.request(
-      `${
-        SERVICES.ATTENDANCE
-      }/attendance/student/${studentId}?${queryParams.toString()}`
-    );
-  }
+async getStudentAttendance(studentId: number) {
+  const res = await fetch(`${SERVICES.ATTENDANCE}/attendance/student/${studentId}`);
+  const json = await res.json();
+  return json.data; // Asegúrate de extraer `data`
+}
 
   async getStudentAttendanceStats(studentId: number) {
     return this.request(
@@ -296,6 +280,11 @@ async getStudentCourses(studentId: string) {
       }/attendance/teacher/${teacherId}?${queryParams.toString()}`
     );
   }
+
+  async getCourseById(courseId: number) {
+  return this.request(`${SERVICES.COURSES}/courses/${courseId}`);
+}
+
 
   // Grades Service
   async createGrade(grade: {
